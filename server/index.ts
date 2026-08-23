@@ -28,20 +28,17 @@ db.exec(`CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value TEXT
 
 const fields = ['sl_no','qfz_ref','packing_list','brand','pl_received_date','pl_received_time','metrology_documents_received','attestation_date','attestation_time','bayan_received_date','bayan_received_time','payment_confirmation_date','payment_confirmation_time','metrology_approval_date','metrology_approval_time','dispatched_date','dispatched_time','remarks'];
 const production = process.env.NODE_ENV === 'production';
-const adminUser = process.env.ADMIN_USERNAME || 'admin';
+const adminUser = process.env.ADMIN_USERNAME?.trim() || 'admin';
 const configValue=(key:string)=>db.prepare('SELECT value FROM app_config WHERE key=?').get(key) as {value:string}|undefined;
 const saveConfig=(key:string,value:string)=>db.prepare('INSERT OR IGNORE INTO app_config (key,value) VALUES (?,?)').run(key,value);
 const storedSecret=configValue('session_secret')?.value;
 const secret=process.env.SESSION_SECRET || storedSecret || crypto.randomBytes(48).toString('base64url');
 if(!process.env.SESSION_SECRET&&!storedSecret)saveConfig('session_secret',secret);
-// The shipped fallback is a bcrypt hash of the documented initial admin
-// password. It supersedes a legacy first-start hash so a redeploy is usable
-// without manual hash generation. Hosting environment values always win.
+// Read the plain password only from the host environment and turn it into a
+// bcrypt hash in memory. This intentionally ignores legacy hash variables so
+// an outdated Render value cannot block the documented admin login.
 const defaultAdminPasswordHash='$2a$12$WeRUJlDox0FB1J14wPwHx.mh9GR.i079SlCzi4axnGMC6rfnK5rRe';
-const configuredHash=process.env.ADMIN_PASSWORD_HASH || (process.env.ADMIN_PASSWORD ? bcrypt.hashSync(process.env.ADMIN_PASSWORD,12) : defaultAdminPasswordHash);
-const storedHash=configValue('admin_password_hash')?.value;
-let adminPasswordHash=configuredHash || storedHash || '';
-if(!adminPasswordHash){const generatedPassword=crypto.randomBytes(18).toString('base64url');adminPasswordHash=bcrypt.hashSync(generatedPassword,12);saveConfig('admin_password_hash',adminPasswordHash);console.log(`FIRST-START ADMIN PASSWORD for ${adminUser}: ${generatedPassword}`);console.log('Save this password now. It is shown only in this startup log and is never stored as plaintext.');}
+const adminPasswordHash=process.env.ADMIN_PASSWORD ? bcrypt.hashSync(process.env.ADMIN_PASSWORD,12) : defaultAdminPasswordHash;
 const app = express();
 if (production) app.set('trust proxy', 1);
 app.disable('x-powered-by');
