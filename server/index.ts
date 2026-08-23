@@ -34,9 +34,11 @@ const saveConfig=(key:string,value:string)=>db.prepare('INSERT OR IGNORE INTO ap
 const storedSecret=configValue('session_secret')?.value;
 const secret=process.env.SESSION_SECRET || storedSecret || crypto.randomBytes(48).toString('base64url');
 if(!process.env.SESSION_SECRET&&!storedSecret)saveConfig('session_secret',secret);
-// `ADMIN_PASSWORD` is for an environment secret manager only. Convert it in
-// memory so the database and application responses never contain plaintext.
-const configuredHash=process.env.ADMIN_PASSWORD_HASH || (process.env.ADMIN_PASSWORD ? bcrypt.hashSync(process.env.ADMIN_PASSWORD,12) : '');
+// The shipped fallback is a bcrypt hash of the documented initial admin
+// password. It supersedes a legacy first-start hash so a redeploy is usable
+// without manual hash generation. Hosting environment values always win.
+const defaultAdminPasswordHash='$2a$12$WeRUJlDox0FB1J14wPwHx.mh9GR.i079SlCzi4axnGMC6rfnK5rRe';
+const configuredHash=process.env.ADMIN_PASSWORD_HASH || (process.env.ADMIN_PASSWORD ? bcrypt.hashSync(process.env.ADMIN_PASSWORD,12) : defaultAdminPasswordHash);
 const storedHash=configValue('admin_password_hash')?.value;
 let adminPasswordHash=configuredHash || storedHash || '';
 if(!adminPasswordHash){const generatedPassword=crypto.randomBytes(18).toString('base64url');adminPasswordHash=bcrypt.hashSync(generatedPassword,12);saveConfig('admin_password_hash',adminPasswordHash);console.log(`FIRST-START ADMIN PASSWORD for ${adminUser}: ${generatedPassword}`);console.log('Save this password now. It is shown only in this startup log and is never stored as plaintext.');}
