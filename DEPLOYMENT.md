@@ -31,13 +31,11 @@ In the Railway service **Variables** page, set:
 
 ```text
 ADMIN_USERNAME=your-admin-name
-ADMIN_PASSWORD_HASH=<bcrypt hash of your chosen password>
-SESSION_SECRET=<at least 32 random characters>
 DATABASE_PATH=/data/shipments.db
 SEED_WORKBOOK_PATH=source/Tracker for Aug 2026 - QFZ outbound shipments.xlsx
 ```
 
-Do not set `ADMIN_PASSWORD` in production. Generate the bcrypt hash locally from the project folder, then copy only the resulting hash into Railway:
+`ADMIN_PASSWORD_HASH` and `SESSION_SECRET` are optional. If both are omitted, the app generates a unique admin password and session secret on its first start. The bcrypt hash and secret are saved in its database; only the one-time admin password is written to the server startup log. If you choose to control the password yourself later, set `ADMIN_PASSWORD_HASH`:
 
 ```bash
 node -e "require('bcryptjs').hash(process.argv[1], 12).then(console.log)" "choose-a-long-unique-password"

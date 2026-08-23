@@ -8,6 +8,7 @@ import multer from 'multer';
 import * as XLSX from 'xlsx';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 
 const root = process.cwd();
 const databasePath = path.resolve(process.env.DATABASE_PATH || path.join(root, 'data', 'shipments.db'));
@@ -23,14 +24,20 @@ db.exec(`CREATE TABLE IF NOT EXISTS shipments (
  payment_confirmation_date TEXT, payment_confirmation_time TEXT, metrology_approval_date TEXT, metrology_approval_time TEXT,
  dispatched_date TEXT, dispatched_time TEXT, remarks TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 ); CREATE INDEX IF NOT EXISTS idx_shipments_ref ON shipments(qfz_ref);`);
+db.exec(`CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value TEXT NOT NULL);`);
 
 const fields = ['sl_no','qfz_ref','packing_list','brand','pl_received_date','pl_received_time','metrology_documents_received','attestation_date','attestation_time','bayan_received_date','bayan_received_time','payment_confirmation_date','payment_confirmation_time','metrology_approval_date','metrology_approval_time','dispatched_date','dispatched_time','remarks'];
 const production = process.env.NODE_ENV === 'production';
-const secret = process.env.SESSION_SECRET || (production ? '' : 'local-development-secret-change-me');
 const adminUser = process.env.ADMIN_USERNAME || 'admin';
-const adminPassword = process.env.ADMIN_PASSWORD || 'change-this-password';
-const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH || '';
-if (production && (secret.length < 32 || !adminPasswordHash.startsWith('$2'))) throw new Error('Production requires a 32+ character SESSION_SECRET and bcrypt ADMIN_PASSWORD_HASH.');
+const configValue=(key:string)=>db.prepare('SELECT value FROM app_config WHERE key=?').get(key) as {value:string}|undefined;
+const saveConfig=(key:string,value:string)=>db.prepare('INSERT OR IGNORE INTO app_config (key,value) VALUES (?,?)').run(key,value);
+const storedSecret=configValue('session_secret')?.value;
+const secret=process.env.SESSION_SECRET || storedSecret || crypto.randomBytes(48).toString('base64url');
+if(!process.env.SESSION_SECRET&&!storedSecret)saveConfig('session_secret',secret);
+const configuredHash=process.env.ADMIN_PASSWORD_HASH || '';
+const storedHash=configValue('admin_password_hash')?.value;
+let adminPasswordHash=configuredHash || storedHash || '';
+if(!adminPasswordHash){const generatedPassword=crypto.randomBytes(18).toString('base64url');adminPasswordHash=bcrypt.hashSync(generatedPassword,12);saveConfig('admin_password_hash',adminPasswordHash);console.log(`FIRST-START ADMIN PASSWORD for ${adminUser}: ${generatedPassword}`);console.log('Save this password now. It is shown only in this startup log and is never stored as plaintext.');}
 const app = express();
 if (production) app.set('trust proxy', 1);
 app.disable('x-powered-by');
@@ -49,7 +56,7 @@ function clean(body:any) { const out:any={}; fields.forEach(f=>out[f]=typeof bod
 app.get('/api/shipments',(_,res)=>res.json(db.prepare('SELECT * FROM shipments ORDER BY id DESC').all().map(enriched)));
 app.get('/api/health',(_,res)=>{try{db.prepare('SELECT 1').get();res.json({ok:true});}catch{res.status(503).json({ok:false});}});
 app.get('/api/shipments/:id',(req,res)=>{const x=db.prepare('SELECT * FROM shipments WHERE id=?').get(req.params.id); x?res.json(enriched(x)):res.status(404).json({error:'Shipment not found.'});});
-app.post('/api/admin/login',sameOrigin,rateLimitLogin,async(req,res)=> { if(typeof req.body?.username!=='string'||typeof req.body?.password!=='string'||req.body.username.length>100||req.body.password.length>200)return res.status(400).json({error:'Invalid login request.'}); const expectedHash=adminPasswordHash||await bcrypt.hash(adminPassword,10); if(req.body.username!==adminUser || !(await bcrypt.compare(req.body.password,expectedHash))) return res.status(401).json({error:'Invalid username or password.'}); attempts.delete(req.ip||req.socket.remoteAddress||'unknown'); const token=jwt.sign({role:'admin'},secret,{algorithm:'HS256',expiresIn:'8h'}); res.cookie('qfz_admin',token,{httpOnly:true,sameSite:'lax',secure:production,maxAge:28800000,path:'/'}); res.json({username:adminUser}); });
+app.post('/api/admin/login',sameOrigin,rateLimitLogin,async(req,res)=> { if(typeof req.body?.username!=='string'||typeof req.body?.password!=='string'||req.body.username.length>100||req.body.password.length>200)return res.status(400).json({error:'Invalid login request.'}); if(req.body.username!==adminUser || !(await bcrypt.compare(req.body.password,adminPasswordHash))) return res.status(401).json({error:'Invalid username or password.'}); attempts.delete(req.ip||req.socket.remoteAddress||'unknown'); const token=jwt.sign({role:'admin'},secret,{algorithm:'HS256',expiresIn:'8h'}); res.cookie('qfz_admin',token,{httpOnly:true,sameSite:'lax',secure:production,maxAge:28800000,path:'/'}); res.json({username:adminUser}); });
 app.post('/api/admin/logout',auth,sameOrigin,(_,res)=>{res.clearCookie('qfz_admin',{httpOnly:true,sameSite:'lax',secure:production,path:'/'});res.json({ok:true});}); app.get('/api/admin/me',(req,res)=>{try{jwt.verify(req.cookies.qfz_admin,secret,{algorithms:['HS256']});res.json({username:adminUser});}catch{res.status(401).json({error:'Not signed in'});}});
 app.post('/api/shipments',auth,sameOrigin,(req,res)=> { const x=clean(req.body), e=valid(x); if(e)return res.status(400).json({error:e}); try { const q=`INSERT INTO shipments (${fields.join(',')}) VALUES (${fields.map(()=>'?').join(',')})`; const info=db.prepare(q).run(...fields.map(f=>x[f])); res.status(201).json(enriched(db.prepare('SELECT * FROM shipments WHERE id=?').get(info.lastInsertRowid))); }catch(err:any){res.status(400).json({error:err.message.includes('UNIQUE')?'QFZ Ref must be unique.':'Could not save shipment.'});}});
 app.put('/api/shipments/:id',auth,sameOrigin,(req,res)=> {const x=clean(req.body),e=valid(x);if(e)return res.status(400).json({error:e});try{const q=`UPDATE shipments SET ${fields.map(f=>`${f}=?`).join(',')}, updated_at=CURRENT_TIMESTAMP WHERE id=?`;if(!db.prepare(q).run(...fields.map(f=>x[f]),req.params.id).changes)return res.status(404).json({error:'Shipment not found.'});res.json(enriched(db.prepare('SELECT * FROM shipments WHERE id=?').get(req.params.id)));}catch(err:any){res.status(400).json({error:err.message.includes('UNIQUE')?'QFZ Ref must be unique.':'Could not save shipment.'});}});
