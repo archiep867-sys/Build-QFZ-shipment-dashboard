@@ -1,4 +1,4 @@
-# Deploy QFZ Shipment Tracker on Railway
+# Deploy Apparel QFZ Shipment Tracker on Railway
 
 This guide creates one normal HTTPS web address that your dad can open from any phone or computer. Your Mac does not need to remain on after deployment.
 
@@ -10,7 +10,7 @@ This guide creates one normal HTTPS web address that your dad can open from any 
 ## Create the Railway service
 
 1. In Railway, select **New Project** → **Deploy from GitHub repo**.
-2. Authorize GitHub if prompted and select the private QFZ Shipment Tracker repository.
+2. Authorize GitHub if prompted and select the private Apparel QFZ Shipment Tracker repository.
 3. Railway detects `railway.toml`: it will run `npm run build`, then `npm start`, and checks `/api/health`.
 
 ## Add persistent storage

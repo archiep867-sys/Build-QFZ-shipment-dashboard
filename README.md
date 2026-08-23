@@ -1,6 +1,6 @@
-# QFZ Shipment Tracker
+# Apparel QFZ Shipment Tracker
 
-QFZ Shipment Tracker replaces the August outbound-shipment spreadsheet with a locally run, searchable dashboard. General users have a read-only view; administrators can manage shipment data and import/export Excel workbooks.
+Apparel QFZ Shipment Tracker replaces the August outbound-shipment spreadsheet with a locally run, searchable dashboard. General users have a read-only view; administrators can manage shipment data and import/export Excel workbooks.
 
 ## Features
 
