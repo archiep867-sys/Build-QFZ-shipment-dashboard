@@ -40,9 +40,12 @@ ADMIN_PASSWORD=your-strong-admin-password
 SESSION_SECRET=long-random-secret
 DATABASE_PATH=/var/data/shipments.db
 SEED_WORKBOOK_PATH=source/Tracker for Aug 2026 - QFZ outbound shipments.xlsx
+DELAY_SLA_HOURS=business-approved-hours (optional)
 ```
 
 `SESSION_SECRET` is optional because the application can generate and store one in its SQLite database, but setting it explicitly is preferred for a production service. The built-in default admin credentials are only for local setup; use `ADMIN_PASSWORD` on Render.
+
+`DELAY_SLA_HOURS` is optional. If it is unset, the application derives its delay threshold from the 75th percentile of completed shipment durations; set it only when an agreed business SLA exists.
 
 ## Verify a deployment
 

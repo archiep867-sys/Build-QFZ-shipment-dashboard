@@ -64,3 +64,7 @@ The application now uses server-side JWT verification for every admin mutation, 
 ## Render Deployment
 
 The application is deployed as one Render web service. Render runs `npm run build`, then `npm start`; the compiled Express server binds to Render's `PORT`, serves the React build, and exposes `/api/health`. `DATABASE_PATH` must point to a SQLite file on the service's persistent disk so shipment edits survive restarts and redeployments. The included workbook seeds an empty database and later startup synchronizations update matching QFZ references. `DEPLOYMENT.md` documents the GitHub → Render → live dashboard flow and the required Render settings.
+
+## Delayed Shipment Calculation
+
+The tracker source has no delayed status or contractual SLA. Status remains derived only from the dispatched date. A separate centralized attention calculation marks an active shipment delayed when its PL Received → current time exceeds the 75th percentile of valid completed PL Received → Dispatched durations in the current database. The host can override that data-derived threshold with `DELAY_SLA_HOURS` when the business agrees a formal SLA. The dashboard card, Needs Attention panel, table indicator, shipment detail, delayed filter, and Excel export use the same calculation and retain the original shipment status.

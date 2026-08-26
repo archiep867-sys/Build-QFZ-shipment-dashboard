@@ -34,6 +34,10 @@ Select **Admin Login** and use the credentials configured in `.env`. Admins can 
 
 Attestation Duration is PL Received date/time → Apply for Attestation date/time. Total Dispatch Duration is PL Received date/time → Dispatched date/time. Missing endpoints display `—`; reversed timestamps are rejected. Durations use elapsed calendar time including weekends and holidays.
 
+## Delayed / Needs Attention
+
+Status and delay are separate. A shipment remains **In Progress** until it has a dispatched date. It is also marked **Delayed** when it has no dispatched date and its elapsed PL Received → now time exceeds the expected dispatch timeline. The default expected timeline is calculated centrally from the 75th percentile of completed shipment durations in the current tracker; this avoids inventing an SLA that is not present in the source workbook. Set `DELAY_SLA_HOURS` in the host environment only after the business agrees a fixed SLA. The Delayed card, Needs Attention section, table indicator, details panel, and Excel export use this same calculation.
+
 ## Excel
 
 From the Admin Dashboard select an `.xlsx` file with **Import Excel**, then choose **Upload & Import Data**. Existing QFZ Refs update their matching record; new QFZ Refs are added. Export downloads the current data with source fields, durations, and status. A preserved copy of the August workbook is included at `source/Tracker for Aug 2026 - QFZ outbound shipments.xlsx`. Use `npm run import:excel -- "/path/to/file.xlsx"` as a development reminder/entry point; the Admin import is the supported workflow.
