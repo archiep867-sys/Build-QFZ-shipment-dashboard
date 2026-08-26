@@ -165,14 +165,15 @@ function ShipmentDetails({
             <span>{shipment.delay_reason}</span>
           </section>
         )}
-        <h3>Operational timeline</h3>
-        <div className="timeline">
-          {stages.map(([label, date, time]) => (
-            <div className="stage" key={String(label)}>
-              <b>{label}</b>
-              <span>
-                {date} {time}
-              </span>
+        <h3>Shipment journey</h3>
+        <div className="timeline journey">
+          {stages.map(([label, date, time], index) => (
+            <div className="stage journeyStage" key={String(label)}>
+              <div className="journeyDot">{index + 1}</div>
+              <div className="journeyContent">
+                <b>{label}</b>
+                <span>{date} {time}</span>
+              </div>
             </div>
           ))}
         </div>
